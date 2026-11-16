@@ -1,0 +1,15 @@
+# Virtual environments
+.venv/
+
+# Local Make configuration
+/Makefile.config
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.*[_-]cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
