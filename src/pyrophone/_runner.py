@@ -5,6 +5,7 @@ import inspect
 from collections.abc import Awaitable, Callable, Coroutine
 
 from ._compile import CompiledGraph
+from ._control import Runtime
 from ._graph import Graph
 from ._runtime import _Session, run_async
 
@@ -34,6 +35,7 @@ def run_sync(
     *,
     on_graph: Callable[[CompiledGraph], None] | None = None,
     execute: bool = True,
+    on_runtime: Callable[[Runtime], None] | None = None,
     session: _Session | None = None,
 ) -> None:
     """Run a graph or zero-argument graph factory in a new event loop.
@@ -41,14 +43,21 @@ def run_sync(
     Graph factories may be synchronous or asynchronous. Construction and graph
     execution share the same loop. No command-line arguments are parsed.
     on_graph observes the validated snapshot before live node creation;
-    execute=False stops after validation and observation.
+    execute=False stops after validation and observation. on_runtime receives
+    editing handles after initialization, before node tasks start.
 
     Ctrl-C cancels execution and completes cooperative cleanup without a
     traceback. Other failures propagate. Inside an existing event loop, use
     ``await run_async(graph)`` instead.
     """
     _run_entry(
-        lambda: _run_target(graph, on_graph=on_graph, execute=execute, session=session)
+        lambda: _run_target(
+            graph,
+            on_graph=on_graph,
+            execute=execute,
+            on_runtime=on_runtime,
+            session=session,
+        )
     )
 
 
@@ -57,6 +66,7 @@ async def _run_target(
     *,
     on_graph: Callable[[CompiledGraph], None] | None,
     execute: bool,
+    on_runtime: Callable[[Runtime], None] | None,
     session: _Session | None,
 ) -> None:
     graph = target if isinstance(target, Graph) else target()
@@ -64,4 +74,10 @@ async def _run_target(
         graph = await graph
     if not isinstance(graph, Graph):
         raise TypeError("A Pyrophone graph factory must return a Graph")
-    await run_async(graph, on_graph=on_graph, execute=execute, session=session)
+    await run_async(
+        graph,
+        on_graph=on_graph,
+        execute=execute,
+        on_runtime=on_runtime,
+        session=session,
+    )

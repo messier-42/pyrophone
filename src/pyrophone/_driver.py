@@ -1,10 +1,12 @@
 """Shared command-line preparation for Python scripts and a future CLI."""
 
 import argparse
+import asyncio
 import sys
 from collections.abc import Sequence
 
 from ._compile import CompiledGraph
+from ._control import Runtime
 from ._graph import Graph
 from ._graph_display import GRAPH_FORMATS, render_graph
 from ._runner import _Factory, run_sync
@@ -62,14 +64,28 @@ def drive(target: Graph | _Factory, *, argv: Sequence[str] | None = None) -> Non
         if options.pp_dump_graph is not None:
             print(render_graph(graph, options.pp_dump_graph), end="", flush=True)
 
-    session = None
-    if options.pp_shell and options.pp_dump_graph is None:
+    runtime: Runtime | None = None
+
+    def inspect_runtime(controller: Runtime) -> None:
+        nonlocal runtime
+        runtime = controller
+
+    async def shell_session(
+        graph: Graph, compiled: CompiledGraph, graph_task: asyncio.Task[None]
+    ) -> None:
         from ._shell import run_shell
 
-        session = run_shell
+        # Sessions begin only after all instances and handles are initialized.
+        assert runtime is not None
+        await run_shell(graph, compiled, graph_task, runtime)
+
+    session = None
+    if options.pp_shell and options.pp_dump_graph is None:
+        session = shell_session
     run_sync(
         target,
         on_graph=inspect_graph,
         execute=options.pp_dump_graph is None,
         session=session,
+        on_runtime=inspect_runtime if session is not None else None,
     )

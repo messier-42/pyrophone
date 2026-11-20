@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from ._channels import Channel, ReceiveEndpoint, SendEndpoint
 from ._compile import CompiledGraph, CompiledNode, compile_graph
+from ._control import NodeHandle, Runtime
 from ._exceptions import NodeExecutionError
 from ._graph import Graph
 from ._node import Node, _bind_node
@@ -25,12 +26,15 @@ class _Bindings:
             await input_port.close()
 
 
-async def _execute(node: CompiledNode, instance: Node, bindings: _Bindings) -> None:
+async def _execute(
+    node: CompiledNode, instance: Node, bindings: _Bindings, handle: NodeHandle
+) -> None:
     try:
         await instance.run()
     except Exception as error:
         raise NodeExecutionError(node.id, node.node_type) from error
     finally:
+        handle._close()
         await bindings.close()
 
 
@@ -39,6 +43,7 @@ async def run_async(
     *,
     on_graph: Callable[[CompiledGraph], None] | None = None,
     execute: bool = True,
+    on_runtime: Callable[[Runtime], None] | None = None,
     session: _Session | None = None,
 ) -> None:
     """Run a fresh instance of each node after validating the entire graph.
@@ -47,6 +52,8 @@ async def run_async(
     execute=False validates and observes the graph without running it. Neither
     option parses command-line arguments. An optional session runs alongside
     the graph; completion of either cancels and awaits the other.
+    on_runtime receives editing handles after all initializers finish, before
+    node tasks or the session start. execute=False skips this callback too.
 
     Normal return closes a node's outputs and inputs. A failed node cancels its
     siblings; cancellation awaits their cooperative cleanup. Run failures appear
@@ -65,12 +72,22 @@ async def run_async(
     if not execute:
         return
     if session is None:
-        await _run_compiled(compiled)
+        await _run_compiled(compiled, on_runtime)
         return
+    ready = asyncio.Event()
+
+    def runtime_ready(runtime: Runtime) -> None:
+        if on_runtime is not None:
+            on_runtime(runtime)
+        ready.set()
+
     async with asyncio.TaskGroup() as tasks:
-        graph_task = tasks.create_task(_run_compiled(compiled), name="pyrophone:graph")
+        graph_task = tasks.create_task(
+            _run_compiled(compiled, runtime_ready), name="pyrophone:graph"
+        )
 
         async def interact() -> None:
+            await ready.wait()
             await session(graph, compiled, graph_task)
 
         session_task = tasks.create_task(interact(), name="pyrophone:session")
@@ -81,9 +98,12 @@ async def run_async(
             task.cancel()
 
 
-async def _run_compiled(compiled: CompiledGraph) -> None:
+async def _run_compiled(
+    compiled: CompiledGraph, on_runtime: Callable[[Runtime], None] | None = None
+) -> None:
     bindings = {node.id: _Bindings() for node in compiled.nodes}
     channels: list[Channel[object]] = []
+    handles: list[NodeHandle] = []
     try:
         for edge in compiled.edges:
             channel = Channel[object]()
@@ -100,13 +120,21 @@ async def _run_compiled(compiled: CompiledGraph) -> None:
             except Exception as error:
                 raise NodeExecutionError(node.id, node.node_type) from error
             instances.append(instance)
+            handles.append(NodeHandle(node, instance))
+        runtime = Runtime(compiled, tuple(handles))
+        if on_runtime is not None:
+            on_runtime(runtime)
         async with asyncio.TaskGroup() as tasks:
-            for node, instance in zip(compiled.nodes, instances, strict=True):
+            for node, instance, handle in zip(
+                compiled.nodes, instances, handles, strict=True
+            ):
                 tasks.create_task(
-                    _execute(node, instance, bindings[node.id]),
+                    _execute(node, instance, bindings[node.id], handle),
                     name=f"pyrophone:{node.node_type.__name__}:{node.id}",
                 )
     finally:
+        for handle in handles:
+            handle._close()
         # Covers initialization failure and tasks cancelled before first execution.
         for channel in channels:
             await channel.output.close()

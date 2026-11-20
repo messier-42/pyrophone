@@ -13,6 +13,7 @@ from prompt_toolkit.input import create_input
 from prompt_toolkit.output import create_output
 
 from ._compile import CompiledGraph
+from ._control import Runtime
 from ._graph import Graph
 from ._terminal import coordinated_output
 
@@ -64,7 +65,10 @@ class _Console(AsynchronousConsole):  # type: ignore[misc]
 
 
 async def run_shell(
-    graph: Graph, compiled_graph: CompiledGraph, graph_task: asyncio.Task[None]
+    graph: Graph,
+    compiled_graph: CompiledGraph,
+    graph_task: asyncio.Task[None],
+    runtime: Runtime,
 ) -> None:
     """Read stdin and write prompts/results to stderr without blocking the graph.
 
@@ -74,7 +78,12 @@ async def run_shell(
     from . import script
 
     namespace = {name: getattr(script, name) for name in script.__all__}
-    namespace.update(graph=graph, compiled_graph=compiled_graph, graph_task=graph_task)
+    namespace.update(
+        graph=graph,
+        compiled_graph=compiled_graph,
+        graph_task=graph_task,
+        runtime=runtime,
+    )
     if sys.stdin.isatty() and sys.stderr.isatty():
         with closing(create_input(stdin=sys.stdin)) as terminal_input:
             with create_app_session(
@@ -94,7 +103,7 @@ async def _interact(console: _Console) -> None:
         await console.interact(
             banner=(
                 "Pyrophone shell (top-level await supported).\n"
-                "Available: graph, compiled_graph, graph_task, asyncio, loop, "
+                "Available: runtime, graph, compiled_graph, graph_task, asyncio, loop, "
                 "and pyrophone.script names.\n"
                 "Ctrl-C interrupts a command; Ctrl-D or exit() stops the graph."
             ),

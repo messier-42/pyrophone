@@ -1,6 +1,7 @@
 """Typed declarations for asynchronous message-processing nodes."""
 
 from ._compile import CompiledEdge, CompiledGraph, CompiledNode, compile_graph
+from ._control import NodeHandle, Runtime
 from ._entry import main
 from ._exceptions import (
     ChannelClosedError,
@@ -37,6 +38,7 @@ __all__ = [
     "Node",
     "NodeDeclaration",
     "NodeExecutionError",
+    "NodeHandle",
     "NodeTypeSchema",
     "Output",
     "OutputPort",
@@ -45,6 +47,7 @@ __all__ = [
     "Property",
     "PropertySchema",
     "PyrophoneError",
+    "Runtime",
     "SchemaError",
     "compile_graph",
     "main",
