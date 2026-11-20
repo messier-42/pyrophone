@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "PyYAML>=6,<7",
+    "aioconsole>=0.9,<1",
+    "prompt-toolkit>=3.0.52,<4",
 ]
 license = "Apache-2.0"
 license-files = ["doc/LICENSE"]
@@ -41,6 +43,7 @@ dev = [
     "mypy>=1.15",
     "types-PyYAML>=6,<7",
     "pytest>=8",
+    "pyte>=0.8,<1",
     "pytest-asyncio>=1",
     "ruff>=0.11",
 ]

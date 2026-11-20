@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 
 from ._compile import CompiledGraph
 from ._graph import Graph
-from ._runtime import run_async
+from ._runtime import _Session, run_async
 
 type _Factory = Callable[[], Graph | Awaitable[Graph]]
 
@@ -34,6 +34,7 @@ def run_sync(
     *,
     on_graph: Callable[[CompiledGraph], None] | None = None,
     execute: bool = True,
+    session: _Session | None = None,
 ) -> None:
     """Run a graph or zero-argument graph factory in a new event loop.
 
@@ -46,7 +47,9 @@ def run_sync(
     traceback. Other failures propagate. Inside an existing event loop, use
     ``await run_async(graph)`` instead.
     """
-    _run_entry(lambda: _run_target(graph, on_graph=on_graph, execute=execute))
+    _run_entry(
+        lambda: _run_target(graph, on_graph=on_graph, execute=execute, session=session)
+    )
 
 
 async def _run_target(
@@ -54,10 +57,11 @@ async def _run_target(
     *,
     on_graph: Callable[[CompiledGraph], None] | None,
     execute: bool,
+    session: _Session | None,
 ) -> None:
     graph = target if isinstance(target, Graph) else target()
     if inspect.isawaitable(graph):
         graph = await graph
     if not isinstance(graph, Graph):
         raise TypeError("A Pyrophone graph factory must return a Graph")
-    await run_async(graph, on_graph=on_graph, execute=execute)
+    await run_async(graph, on_graph=on_graph, execute=execute, session=session)

@@ -1,7 +1,7 @@
 """One-shot execution of validated graph snapshots with structured task ownership."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from ._channels import Channel, ReceiveEndpoint, SendEndpoint
@@ -9,6 +9,8 @@ from ._compile import CompiledGraph, CompiledNode, compile_graph
 from ._exceptions import NodeExecutionError
 from ._graph import Graph
 from ._node import Node, _bind_node
+
+type _Session = Callable[[Graph, CompiledGraph, asyncio.Task[None]], Awaitable[None]]
 
 
 @dataclass
@@ -37,12 +39,14 @@ async def run_async(
     *,
     on_graph: Callable[[CompiledGraph], None] | None = None,
     execute: bool = True,
+    session: _Session | None = None,
 ) -> None:
     """Run a fresh instance of each node after validating the entire graph.
 
     on_graph observes the validated snapshot before any live nodes are allocated.
     execute=False validates and observes the graph without running it. Neither
-    option parses command-line arguments.
+    option parses command-line arguments. An optional session runs alongside
+    the graph; completion of either cancels and awaits the other.
 
     Normal return closes a node's outputs and inputs. A failed node cancels its
     siblings; cancellation awaits their cooperative cleanup. Run failures appear
@@ -60,6 +64,24 @@ async def run_async(
         on_graph(compiled)
     if not execute:
         return
+    if session is None:
+        await _run_compiled(compiled)
+        return
+    async with asyncio.TaskGroup() as tasks:
+        graph_task = tasks.create_task(_run_compiled(compiled), name="pyrophone:graph")
+
+        async def interact() -> None:
+            await session(graph, compiled, graph_task)
+
+        session_task = tasks.create_task(interact(), name="pyrophone:session")
+        _, pending = await asyncio.wait(
+            (graph_task, session_task), return_when=asyncio.FIRST_COMPLETED
+        )
+        for task in pending:
+            task.cancel()
+
+
+async def _run_compiled(compiled: CompiledGraph) -> None:
     bindings = {node.id: _Bindings() for node in compiled.nodes}
     channels: list[Channel[object]] = []
     try:

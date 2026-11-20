@@ -37,8 +37,17 @@ def drive(target: Graph | _Factory, *, argv: Sequence[str] | None = None) -> Non
         metavar="FORMAT",
         help="dump the final graph to stdout and exit without execution (default: yaml)",
     )
+    parser.add_argument(
+        "--pp-shell",
+        action="store_true",
+        help="open an async Python REPL on stdio alongside the graph",
+    )
     options = parser.parse_args(argv)
-    if options.pp_show_graph is None and options.pp_dump_graph is None:
+    if (
+        options.pp_show_graph is None
+        and options.pp_dump_graph is None
+        and not options.pp_shell
+    ):
         run_sync(target)
         return
 
@@ -53,4 +62,14 @@ def drive(target: Graph | _Factory, *, argv: Sequence[str] | None = None) -> Non
         if options.pp_dump_graph is not None:
             print(render_graph(graph, options.pp_dump_graph), end="", flush=True)
 
-    run_sync(target, on_graph=inspect_graph, execute=options.pp_dump_graph is None)
+    session = None
+    if options.pp_shell and options.pp_dump_graph is None:
+        from ._shell import run_shell
+
+        session = run_shell
+    run_sync(
+        target,
+        on_graph=inspect_graph,
+        execute=options.pp_dump_graph is None,
+        session=session,
+    )
