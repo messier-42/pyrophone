@@ -28,6 +28,7 @@ from . import (
     run_async,
     run_sync,
 )
+from .jq import JQ
 from .nodes import (
     Identity,
     IdentityBytes,
@@ -39,6 +40,7 @@ from .nodes import (
 )
 
 __all__ = [
+    "JQ",
     "ChannelClosedError",
     "EndOfStream",
     "Graph",

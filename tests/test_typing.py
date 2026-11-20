@@ -240,3 +240,19 @@ async def inspect(enc: cabe.Encapsulator, dec: cabe.Decapsulator) -> None:
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_jq_exposes_string_expression_and_byte_ports(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone.script import JQ, InputPort, OutputPort
+
+def inspect(node: JQ) -> None:
+    assert_type(node.expr, str)
+    assert_type(node.in_port, InputPort[bytes])
+    assert_type(node.out_port, OutputPort[bytes])
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
