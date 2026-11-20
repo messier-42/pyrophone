@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-vcs>=0.5"]
 build-backend = "hatchling.build"
 
 [project]
 name = "Pyrophone"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "Python message routing DSL environment"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -48,6 +48,11 @@ dev = [
     "pytest-asyncio>=1",
     "ruff>=0.11",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.1.0.dev0"
+raw-options = { dist_name = "Pyrophone" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyrophone"]
