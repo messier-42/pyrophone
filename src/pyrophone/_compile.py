@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from ._exceptions import GraphError
-from ._graph import Graph, PortReference, _validate_connection
+from ._graph import Graph, PortReference, _resolved_schema, _validate_connection
 from ._inspection import Printable, node_details
 from ._node import Node, _resolve_configuration
 from ._schema import NodeTypeSchema
@@ -82,8 +82,11 @@ def compile_graph(graph: Graph) -> CompiledGraph:
     nodes, edges = graph.nodes, graph.edges
     members = set(nodes)
     connected: set[PortReference] = set()
+    incoming = {edge.destination: edge.source for edge in edges}
     for edge in edges:
-        _validate_connection(edge.source, edge.destination, connected)
+        _validate_connection(
+            edge.source, edge.destination, connected, incoming=incoming
+        )
         if edge.source.node not in members or edge.destination.node not in members:
             raise GraphError("connection references a node outside the graph")
         connected.update((edge.source, edge.destination))
@@ -99,7 +102,7 @@ def compile_graph(graph: Graph) -> CompiledGraph:
                 MappingProxyType(
                     _resolve_configuration(node.schema, node.configuration)
                 ),
-                node.schema,
+                _resolved_schema(node, incoming),
             )
             for node in nodes
         ),

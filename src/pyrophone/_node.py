@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from math import isfinite
 from types import MappingProxyType, UnionType
-from typing import TYPE_CHECKING, TypeVar, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, ClassVar, TypeVar, Union, cast, get_args, get_origin
 
 from ._exceptions import ConfigurationError, SchemaError
 from ._inspection import Printable, node_details
@@ -37,6 +37,8 @@ class Node(Printable, metaclass=_NodeMeta):
     _configuration: Mapping[str, object]
     _inputs: Mapping[str, object]
     _outputs: Mapping[str, object]
+    # Internal contract for built-ins that forward an input's exact value/type.
+    _output_type_sources: ClassVar[Mapping[str, str]] = {}
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}>"

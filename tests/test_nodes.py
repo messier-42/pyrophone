@@ -275,3 +275,90 @@ def test_identity_bytes_has_single_concrete_input_and_output() -> None:
     assert list(schema.outputs) == ["out_port"]
     assert schema.inputs["in_port"].type is bytes
     assert schema.outputs["out_port"].type is bytes
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", [str, bytes, str | bytes])
+async def test_print_text_preserves_values_types_and_flushes(
+    kind: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+
+    from pyrophone.script import PrintText
+
+    class Stdout(io.StringIO):
+        flushes = 0
+
+        def flush(self) -> None:
+            self.flushes += 1
+            super().flush()
+
+    stdout = Stdout()
+    monkeypatch.setattr("sys.stdout", stdout)
+    values: list[str | bytes] = ["héllo", "船", "", "first\nsecond"]
+    payloads = [
+        str(value).encode("utf-8")
+        if kind is bytes or (kind is not str and i % 2)
+        else value
+        for i, value in enumerate(values)
+    ]
+    received: list[str | bytes] = []
+
+    @pp.node_type
+    class Emit(pp.Node):
+        out_port = pp.Output[kind]()  # type: ignore[valid-type]
+
+        async def run(self) -> None:
+            for payload in payloads:
+                await self.out_port.send(payload)
+
+    @pp.node_type
+    class Collect(pp.Node):
+        in_port = pp.Input[kind]()  # type: ignore[valid-type]
+
+        async def run(self) -> None:
+            async for payload in self.in_port:
+                received.append(payload)
+
+    graph = declare(Emit) | declare(PrintText) | declare(PrintText) | declare(Collect)
+    compiled = pp.compile_graph(graph)
+    assert compiled.nodes[1].schema.outputs["out_port"].type == kind
+    assert compiled.nodes[2].schema.outputs["out_port"].type == kind
+    await pp.run_async(graph)
+    assert all(
+        actual is original for actual, original in zip(received, payloads, strict=True)
+    )
+    # Two print nodes preserve the stream but each prints every value.
+    assert stdout.getvalue().count("héllo\n") == 2
+    assert stdout.getvalue().count("船\n") == 2
+    assert "b'" not in stdout.getvalue()
+    assert stdout.flushes == len(payloads) * 2
+
+
+@pytest.mark.asyncio
+async def test_print_text_invalid_utf8_prints_repr_and_forwards_bytes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from pyrophone.nodes import PrintText
+
+    payload = b"\xff\n"
+    received: list[bytes] = []
+
+    @pp.node_type
+    class Emit(pp.Node):
+        out_port = pp.Output[bytes]()
+
+        async def run(self) -> None:
+            await self.out_port.send(payload)
+
+    @pp.node_type
+    class Collect(pp.Node):
+        in_port = pp.Input[bytes]()
+
+        async def run(self) -> None:
+            async for value in self.in_port:
+                received.append(value)
+
+    await pp.run_async(declare(Emit) | declare(PrintText) | declare(Collect))
+    assert len(received) == 1 and received[0] is payload
+    assert capsys.readouterr().out == repr(payload) + "\n"

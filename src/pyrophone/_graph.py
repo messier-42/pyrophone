@@ -1,9 +1,9 @@
 """Configured node occurrences and named graph connections."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
-from typing import Literal
+from typing import Literal, get_args
 from uuid import uuid4
 
 from ._exceptions import GraphError
@@ -123,8 +123,49 @@ class Edge(Printable):
         )
 
 
+def _output_type(
+    source: PortReference, incoming: Mapping[PortReference, PortReference]
+) -> object | None:
+    """Follow exact-value forwarding contracts without mutating declarations.
+
+    An open input or a cycle without a concrete producer cannot yet infer a type.
+    """
+    seen: set[PortReference] = set()
+    while source not in seen:
+        seen.add(source)
+        input_name = source.node.node_type._output_type_sources.get(source.name)
+        if input_name is None:
+            return source.schema.type
+        upstream = incoming.get(source.node.port(input_name))
+        if upstream is None:
+            return None
+        source = upstream
+    return None
+
+
+def _resolved_schema(
+    node: NodeDeclaration, incoming: Mapping[PortReference, PortReference]
+) -> NodeTypeSchema:
+    """Specialize compiled output metadata for this graph only."""
+    outputs = dict(node.schema.outputs)
+    for name in node.node_type._output_type_sources:
+        inferred = _output_type(node.port(name), incoming)
+        if inferred is not None:
+            outputs[name] = replace(outputs[name], type=inferred)
+    return (
+        node.schema
+        if outputs == node.schema.outputs
+        else replace(node.schema, outputs=outputs)
+    )
+
+
 def _validate_connection(
-    source: PortReference, destination: PortReference, connected: set[PortReference]
+    source: PortReference,
+    destination: PortReference,
+    connected: set[PortReference],
+    *,
+    incoming: Mapping[PortReference, PortReference],
+    allow_unbound: bool = False,
 ) -> None:
     if not isinstance(source, PortReference) or not isinstance(
         destination, PortReference
@@ -135,9 +176,19 @@ def _validate_connection(
     source_schema, destination_schema = source.schema, destination.schema
     if source in connected or destination in connected:
         raise GraphError("port is already connected; each port permits one channel")
-    if not is_type_compatible(source_schema.type, destination_schema.type):
+    source_type = _output_type(source, incoming)
+    if source_type is None:
+        source_type = source_schema.type
+        # During editing a forwarder's input may be connected later. Only
+        # defer if at least one allowed input type could satisfy this edge.
+        if allow_unbound and any(
+            is_type_compatible(part, destination_schema.type)
+            for part in (get_args(source_type) or (source_type,))
+        ):
+            return
+    if not is_type_compatible(source_type, destination_schema.type):
         raise GraphError(
-            f"incompatible port types: {source.name} ({source_schema.type}) -> "
+            f"incompatible port types: {source.name} ({source_type}) -> "
             f"{destination.name} ({destination_schema.type})"
         )
 
@@ -196,7 +247,23 @@ class Graph(Printable):
         connected = {
             port for edge in self._edges for port in (edge.source, edge.destination)
         }
-        _validate_connection(source, destination, connected)
+        incoming = {edge.destination: edge.source for edge in self._edges}
+        # Do structural validation before using caller-supplied endpoints as
+        # keys. Inference of the new edge uses all existing upstream links.
+        _validate_connection(
+            source, destination, connected, incoming=incoming, allow_unbound=True
+        )
+        incoming[destination] = source
+        # Binding an input can narrow downstream forwarders, including ones
+        # connected earlier. Recheck those edges before mutating the graph.
+        for edge in (*self._edges, Edge(source, destination)):
+            _validate_connection(
+                edge.source,
+                edge.destination,
+                set(),
+                incoming=incoming,
+                allow_unbound=True,
+            )
         # Nothing mutates until every check has succeeded, including endpoints
         # that were not already part of the graph.
         self._nodes[source.node.id] = source.node

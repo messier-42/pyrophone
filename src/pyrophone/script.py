@@ -36,6 +36,7 @@ from .nodes import (
     JSONValue,
     Print,
     PrintBytes,
+    PrintText,
     Transform,
 )
 
@@ -58,6 +59,7 @@ __all__ = [
     "PortHandle",
     "Print",
     "PrintBytes",
+    "PrintText",
     "Property",
     "Runtime",
     "Trace",

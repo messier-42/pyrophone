@@ -359,3 +359,78 @@ def test_compilation_preserves_subtyping_and_invariant_container_rules() -> None
 
     with pytest.raises(pp.GraphError, match="incompatible port types"):
         _ = declare(ListSource) | declare(ListSink)
+
+
+def test_print_text_inference_is_order_independent_and_graph_local() -> None:
+    from pyrophone.nodes import PrintText
+
+    @node_type
+    class TextSource(Node):
+        out_port = Output[str]()
+
+    @node_type
+    class ByteSource(Node):
+        out_port = Output[bytes]()
+
+    @node_type
+    class TextSink(Node):
+        in_port = Input[str]()
+
+    @node_type
+    class ByteSink(Node):
+        in_port = Input[bytes]()
+
+    printer = declare(PrintText)
+    text_source, text_sink = declare(TextSource), declare(TextSink)
+    byte_source, byte_sink = declare(ByteSource), declare(ByteSink)
+    graph = pp.Graph().connect(printer.out_port, byte_sink.in_port)
+    before = graph.nodes, graph.edges
+    with pytest.raises(pp.GraphError, match="incompatible port types"):
+        graph.connect(text_source.out_port, printer.in_port)
+    assert (graph.nodes, graph.edges) == before
+    graph.connect(byte_source.out_port, printer.in_port)
+    byte_compiled = pp.compile_graph(graph)
+    text_compiled = pp.compile_graph(text_source | printer | text_sink)
+    assert (
+        next(n for n in byte_compiled.nodes if n.id == printer.id)
+        .schema.outputs["out_port"]
+        .type
+        is bytes
+    )
+    assert (
+        next(n for n in text_compiled.nodes if n.id == printer.id)
+        .schema.outputs["out_port"]
+        .type
+        is str
+    )
+    assert printer.schema.outputs["out_port"].type == str | bytes
+    with pytest.raises(pp.GraphError, match="incompatible port types"):
+        _ = declare(Source) | declare(PrintText)
+    with pytest.raises(pp.GraphError, match="incompatible port types"):
+        _ = declare(PrintText) | declare(Sink)
+    # Compilation must resolve against the complete edge set too, even if
+    # the upstream connection was added after the downstream one.
+    graph._edges[1] = pp.Edge(text_source.out_port, printer.in_port)
+    with pytest.raises(pp.GraphError, match="incompatible port types"):
+        pp.compile_graph(graph)
+
+
+def test_print_text_does_not_narrow_mixed_streams_or_unbound_cycles() -> None:
+    from pyrophone.nodes import PrintText
+
+    @node_type
+    class MixedSource(Node):
+        out_port = Output[str | bytes]()
+
+    @node_type
+    class ByteSink(Node):
+        in_port = Input[bytes]()
+
+    with pytest.raises(pp.GraphError, match="incompatible port types"):
+        _ = declare(MixedSource) | declare(PrintText) | declare(ByteSink)
+    first, second = declare(PrintText), declare(PrintText)
+    cycle = pp.Graph().connect(first.out_port, second.in_port)
+    cycle.connect(second.out_port, first.in_port)
+    assert (
+        pp.compile_graph(cycle).nodes[0].schema.outputs["out_port"].type == str | bytes
+    )

@@ -1,6 +1,7 @@
 """Reusable node implementations built on the public component model."""
 
 import json
+from typing import ClassVar, overload
 
 from ._node import Node, node_type
 from ._ports import Input, Output
@@ -58,6 +59,33 @@ class Print[T](Transform[T, T]):
 @node_type
 class PrintBytes(Print[bytes]):
     """Print byte payloads (including the b prefix) without decoding them."""
+
+
+@node_type
+class PrintText(Transform[str | bytes, str | bytes]):
+    """Print text or UTF-8 bytes and forward the original value unchanged.
+
+    Invalid UTF-8 prints as a bytes repr. Each print flushes stdout immediately.
+    The graph infers the output type from the connected upstream port.
+    """
+
+    _output_type_sources: ClassVar[dict[str, str]] = {"out_port": "in_port"}
+
+    @overload
+    async def transform(self, value: str) -> str: ...
+
+    @overload
+    async def transform(self, value: bytes) -> bytes: ...
+
+    async def transform(self, value: str | bytes) -> str | bytes:
+        text = value
+        if isinstance(value, bytes):
+            try:
+                text = value.decode("utf-8")
+            except UnicodeDecodeError:
+                text = repr(value)
+        print(text, flush=True)
+        return value
 
 
 class JSONTransform(Transform[bytes, bytes]):

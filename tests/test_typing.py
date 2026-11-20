@@ -256,3 +256,19 @@ def inspect(node: JQ) -> None:
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_print_text_preserves_static_transform_result_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone.script import PrintText
+
+async def inspect(printer: PrintText, mixed: str | bytes) -> None:
+    assert_type(await printer.transform("text"), str)
+    assert_type(await printer.transform(b"text"), bytes)
+    assert_type(await printer.transform(mixed), str | bytes)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
