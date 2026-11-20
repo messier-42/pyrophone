@@ -28,6 +28,7 @@ def test_logs_redraw_above_partial_command(tmp_path: Path, ending: bytes) -> Non
         "logging.basicConfig(level=logging.INFO, format='%(message)s')\n"
         "@node_type\n"
         "class Worker(Node):\n"
+        "    out_port = Output[str]()\n"
         "    async def run(self):\n"
         "        try:\n"
         f"            while not Path({str(trigger)!r}).exists():\n"
@@ -35,10 +36,16 @@ def test_logs_redraw_above_partial_command(tmp_path: Path, ending: bytes) -> Non
         "            await asyncio.to_thread(logging.warning, 'LOG_ONE')\n"
         "            print('PRINT_TWO', flush=True)\n"
         "            logging.warning('LOG_THREE')\n"
+        "            await self.out_port.send('TRACE_VALUE')\n"
         "            await asyncio.Event().wait()\n"
         "        finally:\n"
         "            print('CLEANED', flush=True)\n"
-        "main(Graph(NodeDeclaration(Worker)))\n"
+        "@node_type\n"
+        "class Drain(Node):\n"
+        "    in_port = Input[str]()\n"
+        "    async def run(self):\n"
+        "        async for value in self.in_port: pass\n"
+        "main(Worker() | Drain())\n"
     )
     master, slave = pty.openpty()
     process = subprocess.Popen(
@@ -70,13 +77,29 @@ def test_logs_redraw_above_partial_command(tmp_path: Path, ending: bytes) -> Non
 
     try:
         read_until(lambda: has_line(">>> ".rstrip()))
+        os.write(
+            master,
+            b"trace = runtime.nodes[0].out_port.trace(print); print('TRACING')\n",
+        )
+        read_until(
+            lambda: (
+                has_line("TRACING")
+                and screen.display[screen.cursor.y].rstrip() == ">>>"
+            )
+        )
         os.write(master, b"print('KEEP')\x1b[D\x1b[D")
         read_until(lambda: has_line(">>> print('KEEP')") and screen.cursor.x == 15)
         trigger.touch()
         read_until(
             lambda: all(
                 has_line(line)
-                for line in ("LOG_ONE", "PRINT_TWO", "LOG_THREE", ">>> print('KEEP')")
+                for line in (
+                    "LOG_ONE",
+                    "PRINT_TWO",
+                    "LOG_THREE",
+                    "TRACE_VALUE",
+                    ">>> print('KEEP')",
+                )
             )
         )
         assert screen.cursor.x == 15

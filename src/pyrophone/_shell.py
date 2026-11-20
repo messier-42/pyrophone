@@ -1,6 +1,7 @@
 """Async stdio inspection of a running graph."""
 
 import asyncio
+import builtins
 import signal
 import sys
 from contextlib import closing
@@ -37,12 +38,28 @@ class _Console(AsynchronousConsole):  # type: ignore[misc]
         output: TextIO | None = None,
     ) -> None:
         self._prompt = prompt
+        self._output = output
         # In terminal mode prompt-toolkit exclusively owns stdin. Do not let
         # aioconsole also attach a read transport to the same descriptor.
         streams = (None, _ConsoleWriter(output)) if output is not None else None
         super().__init__(locals=namespace, streams=streams)
         if prompt is not None:
             self.locals["ainput"] = self.raw_input
+
+    def print(
+        self,
+        *values: object,
+        sep: str | None = " ",
+        end: str | None = "\n",
+        file: TextIO | None = None,
+        flush: bool = False,
+    ) -> None:
+        # A shell print function may be retained by a trace callback. During
+        # input, use the coordinated stream; between prompts, write directly.
+        if file is None:
+            editing = self._prompt is not None and self._prompt.app.is_running
+            file = sys.stderr if editing or self._output is None else self._output
+        builtins.print(*values, sep=sep, end=end, file=file, flush=flush)
 
     async def raw_input(self, prompt: str = "") -> str:
         if self._prompt is None:

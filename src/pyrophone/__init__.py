@@ -1,7 +1,7 @@
 """Typed declarations for asynchronous message-processing nodes."""
 
 from ._compile import CompiledEdge, CompiledGraph, CompiledNode, compile_graph
-from ._control import NodeHandle, Runtime
+from ._control import NodeHandle, PortHandle, Runtime
 from ._entry import main
 from ._exceptions import (
     ChannelClosedError,
@@ -19,6 +19,7 @@ from ._properties import Property
 from ._runner import run_sync
 from ._runtime import run_async
 from ._schema import NodeTypeSchema, PortSchema, PropertySchema
+from ._trace import Trace
 
 # Compatibility with the original asynchronous entry point.
 run = run_async
@@ -42,6 +43,7 @@ __all__ = [
     "NodeTypeSchema",
     "Output",
     "OutputPort",
+    "PortHandle",
     "PortReference",
     "PortSchema",
     "Property",
@@ -49,6 +51,7 @@ __all__ = [
     "PyrophoneError",
     "Runtime",
     "SchemaError",
+    "Trace",
     "compile_graph",
     "main",
     "node_type",

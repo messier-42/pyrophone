@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from ._exceptions import ChannelClosedError, EndOfStream
+from ._trace import _notify, _TraceCallbacks
 
 
 @dataclass(eq=False)
@@ -37,6 +38,7 @@ class Channel[T]:
             receiver = self._receivers.popleft()
             if not receiver.done():
                 receiver.set_result(value)
+                self._trace(value)
                 return
         accepted: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         pending = _PendingSend(value, accepted)
@@ -53,6 +55,7 @@ class Channel[T]:
             pending = self._senders.popleft()
             if not pending.accepted.done():
                 pending.accepted.set_result(None)
+                self._trace(pending.value)
                 return pending.value
         if self._closed:
             raise EndOfStream("channel is closed")
@@ -64,8 +67,18 @@ class Channel[T]:
             if receiver in self._receivers:
                 self._receivers.remove(receiver)
 
+    def _trace(self, value: T) -> None:
+        # Snapshot both ends before callbacks can change registrations. Delivery
+        # has already been accepted; no await separates either side's observers.
+        outgoing = self.output._traces.snapshot()
+        incoming = self.input._traces.snapshot()
+        _notify(outgoing, value)
+        _notify(incoming, value)
+
     def _close(self) -> None:
         self._closed = True
+        self.output._traces.close()
+        self.input._traces.close()
         while self._senders:
             pending = self._senders.popleft()
             if not pending.accepted.done():
@@ -81,6 +94,7 @@ class ReceiveEndpoint[T]:
 
     def __init__(self, channel: Channel[T]) -> None:
         self._channel = channel
+        self._traces = _TraceCallbacks[T]()
 
     async def recv(self) -> T:
         return await self._channel._recv()
@@ -102,6 +116,7 @@ class SendEndpoint[T]:
 
     def __init__(self, channel: Channel[T]) -> None:
         self._channel = channel
+        self._traces = _TraceCallbacks[T]()
 
     async def send(self, value: T) -> None:
         await self._channel._send(value)
