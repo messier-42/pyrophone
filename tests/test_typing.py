@@ -86,3 +86,78 @@ class Bad(Node):
         ), result.stdout
     assert 'snippet.py:13: error: Argument 1 to "send"' in result.stdout
     assert 'expected "int"' in result.stdout
+
+
+def test_transform_preserves_distinct_input_and_output_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone import InputPort, OutputPort, Property, node_type
+from pyrophone.nodes import Transform
+
+@node_type
+class Add(Transform[int, int]):
+    amount = Property[int](default=1)
+
+    async def transform(self, value: int) -> int:
+        assert_type(value, int)
+        assert_type(self.amount, int)
+        assert_type(self.in_port, InputPort[int])
+        assert_type(self.out_port, OutputPort[int])
+        return value + self.amount
+
+@node_type
+class Format(Transform[int, str]):
+    async def transform(self, value: int) -> str:
+        assert_type(self.in_port, InputPort[int])
+        assert_type(self.out_port, OutputPort[str])
+        assert_type(await self.in_port.recv(), int)
+        return str(value)
+
+async def inspect(node: Format) -> None:
+    assert_type(await node.transform(1), str)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_transform_rejects_wrong_send_and_result_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from pyrophone.nodes import Transform
+
+class Bad(Transform[int, str]):
+    async def transform(self, value: int) -> str:
+        await self.out_port.send(value)
+        return value
+""",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert 'snippet.py:6: error: Argument 1 to "send"' in result.stdout
+    assert "snippet.py:7: error: Incompatible return value type" in result.stdout
+    assert 'expected "str"' in result.stdout
+
+
+def test_json_transform_exposes_json_values_and_byte_ports(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone import InputPort, OutputPort, node_type
+from pyrophone.nodes import JSONTransform, JSONValue
+
+@node_type
+class Wrap(JSONTransform):
+    async def transform_json(self, value: JSONValue) -> JSONValue:
+        assert_type(self.in_port, InputPort[bytes])
+        assert_type(self.out_port, OutputPort[bytes])
+        return {"value": value}
+
+async def inspect(node: Wrap) -> None:
+    assert_type(await node.transform(b"null"), bytes)
+    assert_type(await node.transform_json(None), JSONValue)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
