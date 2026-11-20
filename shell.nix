@@ -4,7 +4,7 @@ pkgs.mkShell {
   packages = [ pkgs.uv ];
 
   shellHook = ''
-    export VIRTUAL_ENV="$PWD/.venv"
+    export VIRTUAL_ENV="${toString ./.}/.venv"
     export PATH="$VIRTUAL_ENV/bin:$PATH"
   '';
 }

@@ -84,6 +84,18 @@ async def pipeline(
             [b"null", b"false", b"42", '"café"'.encode()],
         ),
         ("[.[] + 1]", [b"[1,2]"], [b"[2,3]"]),
+        pytest.param(
+            "{hopCount, shipData: (.shipData | {name, outdoorTemperature})}",
+            [
+                b'{"hopCount":2,"shipData":{"name":"Armistice",'
+                b'"outdoorTemperature":47.5,"location":[12.5,-47.25],'
+                b'"secret":"discard"},"extra":"discard"}'
+            ],
+            [
+                b'{"hopCount":2,"shipData":{"name":"Armistice","outdoorTemperature":47.5}}'
+            ],
+            id="ship-telemetry-redaction",
+        ),
     ],
 )
 async def test_real_jq_results(

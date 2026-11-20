@@ -236,3 +236,64 @@ def test_terminal_output_restores_handlers_and_preserves_redirected_streams(
     assert created_in_shell.stream is terminal
     assert stdout_handler.stream is redirected
     assert file_handler.stream is file_output
+
+
+def test_shell_edits_real_demo_adder_without_restarting_graph(tmp_path: Path) -> None:
+    adder_path = (
+        Path(__file__).resolve().parents[1] / "doc/examples/01-basic-mqtt/adder.py"
+    )
+    script = tmp_path / "editable.py"
+    script.write_text(
+        "import asyncio, json, runpy\n"
+        "from pyrophone.script import *\n"
+        f"Adder = runpy.run_path({str(adder_path)!r})['Adder']\n"
+        "@node_type\n"
+        "class Source(Node):\n"
+        "    pending = asyncio.Queue()\n"
+        "    out_port = Output[bytes]()\n"
+        "    async def run(self):\n"
+        "        while True:\n"
+        "            await self.out_port.send(await self.pending.get())\n"
+        "@node_type\n"
+        "class Sink(Node):\n"
+        "    received = asyncio.Queue()\n"
+        "    in_port = Input[bytes]()\n"
+        "    async def run(self):\n"
+        "        async for value in self.in_port:\n"
+        "            await self.received.put(json.loads(value))\n"
+        "@main\n"
+        "def application():\n"
+        "    return Source() | Adder(amount=2, attributeName='hopCount') | Sink()\n"
+    )
+    message = (
+        'await graph.nodes[0].node_type.pending.put(b\'{"hopCount":0,"name":"demo"}\')\n'
+        "print('RESULT', await graph.nodes[2].node_type.received.get())\n"
+    )
+    commands = (
+        "adder = runtime.nodes[1]\n"
+        "print('BEFORE', adder.amount)\n" + message + "adder.amount = 10\n"
+        "print('AFTER', adder.amount)\n" + message + "adder.amount = 'bad'\n"
+        "print('STILL', adder.amount)\n"
+        "print('STARTUP', compiled_graph.nodes[1].configuration['amount'])\n"
+        "adder.print()\n"
+        "runtime.print()\n"
+        "adder.amount = 2\n" + message + "exit()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, str(script), "--pp-shell"],
+        input=commands,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "NodeHandle:" in result.stdout
+    assert "Runtime: 3 nodes" in result.stdout
+    assert "amount: 10" in result.stdout
+    assert "BEFORE 2" in result.stderr
+    assert "AFTER 10" in result.stderr
+    assert "STILL 10" in result.stderr
+    assert "STARTUP 2" in result.stderr
+    assert "ConfigurationError" in result.stderr
+    assert result.stderr.count("RESULT {'hopCount': 2, 'name': 'demo'}") == 2
+    assert result.stderr.count("RESULT {'hopCount': 10, 'name': 'demo'}") == 1

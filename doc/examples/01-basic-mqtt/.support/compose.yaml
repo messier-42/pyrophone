@@ -1,0 +1,46 @@
+name: pyrophone-01-basic-mqtt
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    ports:
+      - "0.0.0.0:${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    secrets:
+      - mqtt_password
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mosquitto_passwd -b -c /tmp/mosquitto-passwords admin "$$(cat /run/secrets/mqtt_password)"
+        chown mosquitto:mosquitto /tmp/mosquitto-passwords
+        chmod 600 /tmp/mosquitto-passwords
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mosquitto_pub -h 127.0.0.1 -u admin -P "$$(cat /run/secrets/mqtt_password)" -t pyrophone/health -m ready -q 1'
+      interval: 1s
+      timeout: 2s
+      retries: 15
+
+  khaled:
+    image: alpine:3
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    ports:
+      - "127.0.0.1:${CABE_PORT:-8443}:8443"
+    volumes:
+      - ../.cabe:/state
+      - ./khaled.yaml:/etc/khaled.yaml:ro
+    entrypoint: ["/state/khaled"]
+    command: ["--config-source=disk", "--config=/etc/khaled.yaml", "--log-format=text", "--log-severity=info"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/readyz"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+secrets:
+  mqtt_password:
+    file: ../.password

@@ -1,0 +1,34 @@
+keyStorage:
+  use: disk
+  disk:
+    path: /state/keys
+policyEngine:
+  use: cedar
+policySource:
+  use: inline
+  inline:
+    text: |
+      permit(principal, action == Action::"Encapsulate", resource);
+      permit(principal, action == Action::"Decapsulate", resource);
+clientAuthn:
+  use: tls-ca
+  tls-ca:
+    caBundlePath: /state/ca.pem
+claimsMapping:
+  use: static
+  static:
+    principals:
+      - uri: urn:pyrophone:demo
+        claims:
+          role: demo
+listeners:
+  - use: http
+    address: 0.0.0.0:8443
+    http:
+      tls:
+        serverCertificate:
+          source: file
+          certificateFilePath: /state/server.pem
+          keyFilePath: /state/server-key.pem
+monitoring:
+  address: 0.0.0.0:9090
