@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="472" height="472" viewBox="0 0 472 472" role="img" aria-labelledby="title desc">
+  <title id="title">Pyrophone symbol</title>
+  <desc id="desc">A lowercase p formed from three flowing channels with flame-like tips.</desc>
+  <g id="symbol" fill="#FFFFFF" fill-rule="evenodd" transform="translate(99 40)">
+    <path d="M0 392V214C0 129 56 68 134 60C189 56 219 42 251 0V23C251 75 213 96 153 98C84 98 34 145 34 216V392Z"/>
+    <path d="M48 392V217C48 154 92 115 151 112C206 111 234 101 274 58V81C274 130 231 147 167 147H158C116 147 82 177 82 220V392Z"/>
+    <path d="M97 392V240C97 195 129 159 171 159H215C249 176 272 205 272 245C272 292 233 332 184 332C165 332 146 327 133 318V392Z M133 275C147 285 162 291 183 291C209 291 231 269 231 244C231 216 210 194 183 194C155 194 133 216 133 242Z"/>
+  </g>
+</svg>
