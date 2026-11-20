@@ -31,7 +31,7 @@ async def _execute(node: CompiledNode, instance: Node, bindings: _Bindings) -> N
         await bindings.close()
 
 
-async def run(graph: Graph) -> None:
+async def run_async(graph: Graph) -> None:
     """Run a fresh instance of each node after validating the entire graph.
 
     Normal return closes a node's outputs and inputs. A failed node cancels its

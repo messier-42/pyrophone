@@ -161,3 +161,61 @@ async def inspect(node: Wrap) -> None:
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_script_entry_points_preserve_factory_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone.script import *
+
+@main
+def build() -> Graph:
+    return Graph()
+
+@main()
+def configured() -> Graph:
+    return Graph()
+
+@pyrophone.main
+async def build_async() -> Graph:
+    return Graph()
+
+@pyrophone.main()
+async def configured_async() -> Graph:
+    return Graph()
+
+assert_type(build(), Graph)
+assert_type(configured(), Graph)
+assert_type(main(Graph()), None)
+assert_type(run_sync(Graph()), None)
+
+async def inspect() -> None:
+    assert_type(await build_async(), Graph)
+    assert_type(await configured_async(), Graph)
+    assert_type(await run_async(Graph()), None)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_identity_preserves_static_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone.script import Identity, IdentityBytes, InputPort, OutputPort, node_type
+
+@node_type
+class IdentityInt(Identity[int]):
+    pass
+
+async def inspect(identity: IdentityInt, byte_identity: IdentityBytes) -> None:
+    assert_type(identity.in_port, InputPort[int])
+    assert_type(identity.out_port, OutputPort[int])
+    assert_type(await identity.transform(3), int)
+    assert_type(await byte_identity.transform(b"value"), bytes)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

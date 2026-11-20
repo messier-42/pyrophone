@@ -230,3 +230,48 @@ async def test_print_bytes_preserves_payload_and_flushes(
     )
     assert stdout.getvalue() == "".join(f"{value!r}\n" for value in payloads)
     assert stdout.flushes == len(payloads)
+
+
+@pytest.mark.asyncio
+async def test_identity_preserves_object_identity_and_stream_order() -> None:
+    from pyrophone.nodes import Identity
+
+    payloads: list[object] = [{"nested": [1, 2]}, None, b"\x00\xff"]
+    received: list[object] = []
+
+    @pp.node_type
+    class IdentityObject(Identity[object]):
+        pass
+
+    @pp.node_type
+    class Emit(pp.Node):
+        out_port = pp.Output[object]()
+
+        async def run(self) -> None:
+            for payload in payloads:
+                await self.out_port.send(payload)
+
+    @pp.node_type
+    class Collect(pp.Node):
+        in_port = pp.Input[object]()
+
+        async def run(self) -> None:
+            async for value in self.in_port:
+                received.append(value)
+
+    await pp.run_async(declare(Emit) | declare(IdentityObject) | declare(Collect))
+    assert len(received) == len(payloads)
+    assert all(
+        actual is expected for actual, expected in zip(received, payloads, strict=True)
+    )
+    assert received == [{"nested": [1, 2]}, None, b"\x00\xff"]
+
+
+def test_identity_bytes_has_single_concrete_input_and_output() -> None:
+    from pyrophone.script import IdentityBytes
+
+    schema = pp.node_type_schema(IdentityBytes)
+    assert list(schema.inputs) == ["in_port"]
+    assert list(schema.outputs) == ["out_port"]
+    assert schema.inputs["in_port"].type is bytes
+    assert schema.outputs["out_port"].type is bytes
