@@ -8,6 +8,7 @@ from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, TypeVar, Union, cast, get_args, get_origin
 
 from ._exceptions import ConfigurationError, SchemaError
+from ._inspection import Printable, node_details
 from ._ports import Input, Output
 from ._properties import Property
 from ._schema import (
@@ -30,12 +31,20 @@ class _NodeMeta(type):
         return NodeDeclaration(cast(type[Node], cls), configuration)
 
 
-class Node(metaclass=_NodeMeta):
+class Node(Printable, metaclass=_NodeMeta):
     """Base for node implementations. Runtime construction is framework-owned."""
 
     _configuration: Mapping[str, object]
     _inputs: Mapping[str, object]
     _outputs: Mapping[str, object]
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__}>"
+
+    def _describe(self) -> str:
+        return node_details(
+            type(self), self._configuration, node_type_schema(type(self))
+        )
 
     async def run(self) -> None:
         raise NotImplementedError("Node subclasses must implement run()")

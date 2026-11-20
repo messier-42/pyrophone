@@ -7,6 +7,7 @@ from typing import Literal
 from uuid import uuid4
 
 from ._exceptions import GraphError
+from ._inspection import Printable, node_details, type_name
 from ._node import Node, _resolve_configuration, node_type_schema
 from ._schema import NodeTypeSchema, PortSchema, is_type_compatible
 
@@ -14,7 +15,7 @@ type Direction = Literal["input", "output"]
 
 
 @dataclass(frozen=True, eq=False)
-class NodeDeclaration:
+class NodeDeclaration(Printable):
     """An occurrence, with independent configuration and a stable unique ID.
 
     Configuration is shallowly read-only; nested values are copied on creation.
@@ -37,6 +38,14 @@ class NodeDeclaration:
             MappingProxyType(_resolve_configuration(schema, self.configuration)),
         )
 
+    def __repr__(self) -> str:
+        return f"<Node {self.node_type.__name__}#{self.id[:8]}>"
+
+    def _describe(self) -> str:
+        return node_details(
+            self.node_type, self.configuration, self.schema, node_id=self.id
+        )
+
     def port(self, name: str) -> "PortReference":
         if name in self.schema.inputs:
             return PortReference(self, name, "input")
@@ -52,12 +61,26 @@ class NodeDeclaration:
 
 
 @dataclass(frozen=True)
-class PortReference:
+class PortReference(Printable):
     """A named port on one occurrence, never a live runtime endpoint."""
 
     node: NodeDeclaration
     name: str
     direction: Direction
+
+    def __repr__(self) -> str:
+        return (
+            f"<Port {self.node.node_type.__name__}#{self.node.id[:8]}"
+            f".{self.name} ({self.direction})>"
+        )
+
+    def _describe(self) -> str:
+        return (
+            f"Port: {self.node.node_type.__name__}.{self.name}\n"
+            f"  Node ID: {self.node.id}\n"
+            f"  Direction: {self.direction}\n"
+            f"  Type: {type_name(self.schema.type)}"
+        )
 
     @property
     def schema(self) -> PortSchema:
@@ -76,9 +99,28 @@ class PortReference:
 
 
 @dataclass(frozen=True)
-class Edge:
+class Edge(Printable):
     source: PortReference
     destination: PortReference
+
+    def __repr__(self) -> str:
+        source, destination = self.source, self.destination
+        return (
+            f"<Edge {source.node.node_type.__name__}#{source.node.id[:8]}"
+            f".{source.name} -> "
+            f"{destination.node.node_type.__name__}#{destination.node.id[:8]}"
+            f".{destination.name}>"
+        )
+
+    def _describe(self) -> str:
+        source, destination = self.source, self.destination
+        return (
+            "Edge:\n"
+            f"  From: {source.node.node_type.__name__}#{source.node.id}.{source.name}"
+            f" ({type_name(source.schema.type)})\n"
+            f"  To: {destination.node.node_type.__name__}#{destination.node.id}"
+            f".{destination.name} ({type_name(destination.schema.type)})"
+        )
 
 
 def _validate_connection(
@@ -117,7 +159,7 @@ def _implicit_port(node: NodeDeclaration, direction: Direction) -> PortReference
     )
 
 
-class Graph:
+class Graph(Printable):
     """Editable graph with stable tuple inspection views.
 
     ``connect`` atomically adds endpoints and an edge, returning this graph.
@@ -133,6 +175,14 @@ class Graph:
             if not isinstance(node, NodeDeclaration):
                 raise GraphError("graphs require node declarations")
             self._nodes[node.id] = node
+
+    def __repr__(self) -> str:
+        return f"Graph(nodes={len(self._nodes)}, edges={len(self._edges)})"
+
+    def _describe(self) -> str:
+        from ._graph_display import format_graph
+
+        return format_graph(self)
 
     @property
     def nodes(self) -> tuple[NodeDeclaration, ...]:

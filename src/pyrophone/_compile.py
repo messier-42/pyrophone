@@ -6,12 +6,13 @@ from types import MappingProxyType
 
 from ._exceptions import GraphError
 from ._graph import Graph, PortReference, _validate_connection
+from ._inspection import Printable, node_details
 from ._node import Node, _resolve_configuration
 from ._schema import NodeTypeSchema
 
 
 @dataclass(frozen=True)
-class CompiledNode:
+class CompiledNode(Printable):
     """Configured occurrence retaining its original declaration ID.
 
     Configuration is shallowly read-only, with nested values detached from the
@@ -23,19 +24,52 @@ class CompiledNode:
     configuration: Mapping[str, object]
     schema: NodeTypeSchema
 
+    def __repr__(self) -> str:
+        return f"<CompiledNode {self.node_type.__name__}#{self.id[:8]}>"
+
+    def _describe(self) -> str:
+        return node_details(
+            self.node_type,
+            self.configuration,
+            self.schema,
+            kind="CompiledNode",
+            node_id=self.id,
+        )
+
 
 @dataclass(frozen=True)
-class CompiledEdge:
+class CompiledEdge(Printable):
     source_id: str
     source_port: str
     destination_id: str
     destination_port: str
 
+    def __repr__(self) -> str:
+        return (
+            f"<CompiledEdge {self.source_id[:8]}.{self.source_port} -> "
+            f"{self.destination_id[:8]}.{self.destination_port}>"
+        )
+
+    def _describe(self) -> str:
+        return (
+            "CompiledEdge:\n"
+            f"  From: {self.source_id}.{self.source_port}\n"
+            f"  To: {self.destination_id}.{self.destination_port}"
+        )
+
 
 @dataclass(frozen=True)
-class CompiledGraph:
+class CompiledGraph(Printable):
     nodes: tuple[CompiledNode, ...]
     edges: tuple[CompiledEdge, ...]
+
+    def __repr__(self) -> str:
+        return f"CompiledGraph(nodes={len(self.nodes)}, edges={len(self.edges)})"
+
+    def _describe(self) -> str:
+        from ._graph_display import format_graph
+
+        return format_graph(self, title="CompiledGraph")
 
 
 def compile_graph(graph: Graph) -> CompiledGraph:

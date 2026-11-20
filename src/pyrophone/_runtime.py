@@ -1,10 +1,11 @@
 """One-shot execution of validated graph snapshots with structured task ownership."""
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ._channels import Channel, ReceiveEndpoint, SendEndpoint
-from ._compile import CompiledNode, compile_graph
+from ._compile import CompiledGraph, CompiledNode, compile_graph
 from ._exceptions import NodeExecutionError
 from ._graph import Graph
 from ._node import Node, _bind_node
@@ -31,8 +32,17 @@ async def _execute(node: CompiledNode, instance: Node, bindings: _Bindings) -> N
         await bindings.close()
 
 
-async def run_async(graph: Graph) -> None:
+async def run_async(
+    graph: Graph,
+    *,
+    on_graph: Callable[[CompiledGraph], None] | None = None,
+    execute: bool = True,
+) -> None:
     """Run a fresh instance of each node after validating the entire graph.
+
+    on_graph observes the validated snapshot before any live nodes are allocated.
+    execute=False validates and observes the graph without running it. Neither
+    option parses command-line arguments.
 
     Normal return closes a node's outputs and inputs. A failed node cancels its
     siblings; cancellation awaits their cooperative cleanup. Run failures appear
@@ -46,6 +56,10 @@ async def run_async(graph: Graph) -> None:
     cancellation timeouts, restart policies, or background runtime tasks.
     """
     compiled = compile_graph(graph)
+    if on_graph is not None:
+        on_graph(compiled)
+    if not execute:
+        return
     bindings = {node.id: _Bindings() for node in compiled.nodes}
     channels: list[Channel[object]] = []
     try:

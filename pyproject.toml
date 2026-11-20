@@ -9,6 +9,7 @@ description = "Python message routing DSL environment"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "PyYAML>=6,<7",
 ]
 license = "Apache-2.0"
 license-files = ["doc/LICENSE"]
@@ -38,6 +39,7 @@ irc = []
 [dependency-groups]
 dev = [
     "mypy>=1.15",
+    "types-PyYAML>=6,<7",
     "pytest>=8",
     "pytest-asyncio>=1",
     "ruff>=0.11",
