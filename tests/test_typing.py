@@ -219,3 +219,24 @@ async def inspect(identity: IdentityInt, byte_identity: IdentityBytes) -> None:
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_cabe_transforms_preserve_byte_port_types(tmp_path: Path) -> None:
+    result = check_snippet(
+        tmp_path,
+        """
+from typing import assert_type
+from pyrophone.script import cabe, InputPort, OutputPort
+
+async def inspect(enc: cabe.Encapsulator, dec: cabe.Decapsulator) -> None:
+    assert_type(enc.in_port, InputPort[bytes])
+    assert_type(enc.out_port, OutputPort[bytes])
+    assert_type(enc.attrs, dict[str, object])
+    assert_type(enc.service, dict[str, object])
+    assert_type(await enc.transform(b"payload"), bytes)
+    assert_type(dec.in_port, InputPort[bytes])
+    assert_type(dec.out_port, OutputPort[bytes])
+    assert_type(await dec.transform(b"wire"), bytes)
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
