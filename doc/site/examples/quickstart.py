@@ -1,31 +1,23 @@
-"""Route one message through a source, a transform, and a sink."""
-
-from pyrophone.script import Graph, Input, Node, Output, Transform, main, node_type
-
+from pyrophone.script import *
+import asyncio
 
 @node_type
-class Greeting(Node):
-    out = Output[str]()
-
-    async def run(self) -> None:
-        await self.out.send("hello, pyrophone")
-
+class Greeting(Source[str]):
+    async def produce(self):
+        while True:
+            yield "hello, pyrophone"
+            await asyncio.sleep(1)
 
 @node_type
 class Uppercase(Transform[str, str]):
     async def transform(self, value: str) -> str:
         return value.upper()
 
-
 @node_type
-class Display(Node):
-    incoming = Input[str]()
-
-    async def run(self) -> None:
-        async for message in self.incoming:
-            print(message)
-
+class Display(Sink[str]):
+    async def consume(self, message: str):
+        print(message, flush=True)
 
 @main
-def application() -> Graph:
+def graph():
     return Greeting() | Uppercase() | Display()

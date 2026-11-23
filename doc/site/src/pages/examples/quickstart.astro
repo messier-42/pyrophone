@@ -1,0 +1,56 @@
+---
+import { Code } from '@astrojs/starlight/components';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import quickstart from '../../../examples/quickstart.py?raw';
+import Mermaid from '../../components/Mermaid.astro';
+---
+
+<StarlightPage frontmatter={{ title: 'Quickstart Example' }}>
+  <p>In this example, we demonstrate a trivial Pyrophone program to convey the principles of a node-based dataflow data processing architecture.</p>
+  <Mermaid
+    id="quickstart-diagram"
+    label="Greeting emits a message, Uppercase transforms it, and Display prints it."
+    source={`
+flowchart LR
+  Greeting@{ shape: "odd", label: "Greeting" } --> Uppercase["Uppercase\nTransform"] --> Display@{ shape: "curv-trap", label: "Display" }
+`} />
+
+  <p>This example will show us defining three custom node types:</p>
+  <ul>
+    <li>a <code>Greeting</code> source node which emits a textual message (<code>hello, pyrophone</code>);</li>
+    <li>an <code>Uppercase</code> transformation node which receives textual messages, converts them to uppercase, and then outputs them;</li>
+    <li>a <code>Display</code> sink node which prints every message it receives on stdout.</li>
+  </ul>
+
+  <h2>Steps</h2>
+  <p>Let's see how this can be accomplished in three easy steps:</p>
+
+  <ol>
+    <li>
+      <p>Install Pyrophone from <a href="https://pypi.org/project/Pyrophone/">PyPI</a>.</p>
+      <Code lang="sh" code="python3 -m pip install Pyrophone" />
+    </li>
+
+    <li>
+      <p>Create the file <code>quickstart.py</code>.</p>
+      <Code lang="python" title="quickstart.py" code={quickstart} />
+    </li>
+
+    <li>
+      <p>Run.</p>
+      <Code lang="sh" code="python3 quickstart.py" />
+      <Code lang="text" code={'HELLO, PYROPHONE\nHELLO, PYROPHONE\nHELLO, PYROPHONE'} />
+      <p>The processing pipeline prints one message per second to stdout. Hit Ctrl-C to stop.</p>
+    </li>
+  </ol>
+</StarlightPage>
+
+<style>
+  :global(#quickstart-diagram) {
+    overflow-x: auto;
+  }
+
+  :global(#quickstart-diagram > svg) {
+    min-inline-size: 39rem;
+  }
+</style>

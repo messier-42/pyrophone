@@ -40,6 +40,7 @@ export default defineConfig({
         {
           label: 'Examples',
           items: [
+            {label: 'Quickstart Example', link: '/examples/quickstart/'},
             {autogenerate: {directory: 'examples'}},
           ],
         },
