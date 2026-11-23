@@ -1,9 +1,11 @@
 // @ts-check
+import {satteri} from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
 import {defineConfig} from 'astro/config';
 import codeblocks from 'starlight-codeblocks';
 import starlightPydocs, {pydocsSidebarGroup} from 'starlight-pydocs';
 import flexoki from 'starlight-theme-flexoki';
+import {mermaidMarkdown} from './src/lib/mermaid.ts';
 
 const repository = 'messier-42/pyrophone';
 
@@ -11,10 +13,12 @@ export default defineConfig({
   site: 'https://pyrophone.dev',
   publicDir: '../logo',
   trailingSlash: 'always',
+  markdown: {processor: satteri({mdastPlugins: [mermaidMarkdown]})},
   integrations: [
     starlight({
       title: 'Pyrophone',
       description: 'A Python DSL for message processing.',
+      customCss: ['./src/styles/mermaid.css'],
       expressiveCode: {defaultProps: {wrap: true}},
       logo: {src: '../logo/pyrophone-logo.svg', replacesTitle: true},
       favicon: '/pyrophone-logo.svg',
