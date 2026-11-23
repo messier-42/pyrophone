@@ -42,6 +42,15 @@ export default defineConfig({
       ],
       sidebar: [
         {
+          label: 'Narrative Overview',
+          items: [
+            {
+              label: 'Introduction',
+              link: '/',
+            },
+          ],
+        },
+        {
           label: 'Examples',
           items: [
             {label: 'Quickstart Example', link: '/examples/quickstart/'},
