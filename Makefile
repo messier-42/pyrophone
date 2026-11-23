@@ -1,9 +1,10 @@
 UV ?= uv
 PYCABE_PATH ?= ../PyCABE
+DOCS_NPM ?= npm --prefix doc/site
 
 -include Makefile.config
 
-.PHONY: build venv dev dev-cabe test lint typecheck check clean nix-shell
+.PHONY: build venv dev dev-cabe test lint typecheck check clean nix-shell doc doc-preview
 
 build:
 	$(UV) build
@@ -32,6 +33,13 @@ check: test lint typecheck
 clean:
 	rm -rf dist .venv .*_cache uv.lock
 	find . -iname __pycache__ | xargs rm -rf
+	rm -rf doc/site/{dist,.astro}
 
 nix-shell:
 	nix-shell
+
+doc:
+	$(DOCS_NPM) run build
+
+doc-preview:
+	$(DOCS_NPM) run preview
