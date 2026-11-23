@@ -3,17 +3,70 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from typing import cast
+from collections.abc import AsyncGenerator, Callable
+from typing import assert_type, cast
 
 import pytest
 
 import pyrophone as pp
+import pyrophone.script as script
 from pyrophone.nodes import Transform
 
 
 def declare(cls: type[pp.Node], **configuration: object) -> pp.NodeDeclaration:
     return cast(Callable[..., pp.NodeDeclaration], cls)(**configuration)
+
+
+@pytest.mark.asyncio
+async def test_source_and_sink_stream_values_in_order() -> None:
+    seen: list[int] = []
+
+    @pp.node_type
+    class Generate(script.Source[int]):
+        async def produce(self) -> AsyncGenerator[int, None]:
+            assert_type(self.out_port, pp.OutputPort[int])
+            for value in (1, 2, 3):
+                yield value
+
+    @pp.node_type
+    class Collect(script.Sink[int]):
+        async def consume(self, value: int) -> None:
+            assert_type(self.in_port, pp.InputPort[int])
+            seen.append(value)
+
+    source, sink = declare(Generate), declare(Collect)
+    assert not source.schema.inputs and source.schema.outputs["out_port"].type is int
+    assert not sink.schema.outputs and sink.schema.inputs["in_port"].type is int
+    async with asyncio.timeout(2):
+        await pp.run(source | sink)
+    assert seen == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_source_closes_generator_when_send_is_cancelled() -> None:
+    pending = asyncio.Event()
+    closed = asyncio.Event()
+
+    @pp.node_type
+    class Generate(script.Source[int]):
+        async def produce(self) -> AsyncGenerator[int, None]:
+            try:
+                yield 1
+                pending.set()
+                yield 2
+            finally:
+                closed.set()
+
+    @pp.node_type
+    class Wait(script.Sink[int]):
+        async def consume(self, value: int) -> None:
+            await asyncio.Event().wait()
+
+    async with asyncio.timeout(2), asyncio.TaskGroup() as tasks:
+        task = tasks.create_task(pp.run(declare(Generate) | declare(Wait)))
+        await pending.wait()
+        task.cancel()
+    assert closed.is_set()
 
 
 @pp.node_type

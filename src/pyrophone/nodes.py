@@ -1,6 +1,8 @@
 """Reusable node implementations built on the public component model."""
 
 import json
+from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from typing import ClassVar, overload
 
 from ._node import Node, node_type
@@ -9,6 +11,41 @@ from ._ports import Input, Output
 type JSONValue = (
     bool | int | float | str | list[JSONValue] | dict[str, JSONValue] | None
 )
+
+
+class Source[T](Node):
+    """Send the values from an async generator through one output port.
+
+    Override produce() and register a concrete subclass with node_type.
+    The next value is requested after the current send is accepted.
+    """
+
+    out_port = Output[T](description="Produced values.")
+
+    async def run(self) -> None:
+        async with aclosing(self.produce()) as values:
+            async for value in values:
+                await self.out_port.send(value)
+
+    def produce(self) -> AsyncGenerator[T, None]:
+        raise NotImplementedError("Source subclasses must implement produce()")
+
+
+class Sink[T](Node):
+    """Consume values from one input port in stream order.
+
+    Override consume() and register a concrete subclass with node_type.
+    Each call finishes before the next input is received.
+    """
+
+    in_port = Input[T](description="Values to consume.")
+
+    async def run(self) -> None:
+        async for value in self.in_port:
+            await self.consume(value)
+
+    async def consume(self, value: T) -> None:
+        raise NotImplementedError("Sink subclasses must implement consume()")
 
 
 class Transform[InputT, OutputT](Node):

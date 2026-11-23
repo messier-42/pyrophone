@@ -37,6 +37,8 @@ from .nodes import (
     Print,
     PrintBytes,
     PrintText,
+    Sink,
+    Source,
     Transform,
 )
 
@@ -62,6 +64,8 @@ __all__ = [
     "PrintText",
     "Property",
     "Runtime",
+    "Sink",
+    "Source",
     "Trace",
     "Transform",
     "cabe",
