@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 [project.urls]
-Documentation = "https://pyrophone.org/"
+Documentation = "https://pyrophone.dev/"
 Repository = "https://github.com/messier-42/pyrophone"
 Issues = "https://github.com/messier-42/pyrophone/issues"
 

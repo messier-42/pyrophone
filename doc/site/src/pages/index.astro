@@ -1,0 +1,31 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const frontmatter = {
+  title: 'Pyrophone',
+  description: 'Express custom message routing flows in just a few lines of code using a powerful dataflow-based Python DSL.',
+  template: 'splash',
+  hero: {
+    tagline: 'Express custom message routing flows in just a few lines of Python.',
+    actions: [
+      { text: 'See an example', link: '/examples/quickstart/', icon: 'right-arrow' },
+      { text: 'Python API', link: '/api/pyrophone/', variant: 'minimal' },
+    ],
+  },
+} as const;
+---
+
+<StarlightPage frontmatter={frontmatter} hasSidebar={true}>
+  <h2>What is Pyrophone?</h2>
+  <p>Pyrophone is a fully asyncio-native Python library and DSL used to construct custom message routing and data processing flows in just a few lines of Python code. It is a node-based dataflow message processing, transformation and filtration architecture that allows you to define custom message routing and processing flows in a concise and easy to understand Python DSL.</p>
+
+  <p>Example use cases include:</p>
+  <ul>
+    <li><strong>Message queue bridging.</strong> Receiving messages on an MQTT topic, filtering or transforming them, and sending them onwards on another MQTT topic — or any other message queue protocol.</li>
+    <li><strong>Encryption.</strong> Receive messages and decrypt or encrypt them before forwarding them onwards.</li>
+    <li><strong>Transformation.</strong> Receive messages containing structured JSON (or other data) and remove sensitive fields, or transmute messages in arbitrary ways using just a few lines of code, before forwarding onwards.</li>
+    <li><strong>Diverse sources and sinks.</strong> Receive messages from diverse sources such as files or HTTP/REST endpoints and bridge them to message queues, or vice versa.</li>
+  </ul>
+
+  <p>To find out more, <a href="/examples/quickstart/">see the quickstart example.</a></p>
+</StarlightPage>
