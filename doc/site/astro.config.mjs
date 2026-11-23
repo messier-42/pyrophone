@@ -52,6 +52,13 @@ export default defineConfig({
               label: 'Introduction',
               link: '/',
             },
+            {autogenerate: {directory: 'overview'}},
+          ],
+        },
+        {
+          label: 'Predefined Node Types',
+          items: [
+            {autogenerate: {directory: 'nodes'}},
           ],
         },
         {
