@@ -15,6 +15,7 @@
     "@astrojs/starlight": "0.43.1",
     "@mermanjs/node": "0.11.0",
     "astro": "7.4.13",
+    "starlight-codeblocks": "1.5.0",
     "starlight-pydocs": "0.5.1",
     "starlight-theme-flexoki": "0.3.0"
   }

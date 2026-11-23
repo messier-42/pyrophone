@@ -1,6 +1,7 @@
 // @ts-check
 import starlight from '@astrojs/starlight';
 import {defineConfig} from 'astro/config';
+import codeblocks from 'starlight-codeblocks';
 import starlightPydocs, {pydocsSidebarGroup} from 'starlight-pydocs';
 import flexoki from 'starlight-theme-flexoki';
 
@@ -21,6 +22,7 @@ export default defineConfig({
       editLink: {baseUrl: `https://github.com/${repository}/edit/master/doc/site/`},
       plugins: [
         flexoki(),
+        codeblocks(),
         starlightPydocs({
           pythonInventory: false,
           runner: {command: ['uvx', '--python', '3.12', '--from', 'griffe==2.4.1', 'griffe']},
