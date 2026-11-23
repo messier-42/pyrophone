@@ -25,10 +25,12 @@ export default defineConfig({
         codeblocks(),
         starlightPydocs({
           pythonInventory: false,
+          components: {ModuleDoc: './src/components/ApiModuleDoc.astro'},
           runner: {command: ['uvx', '--python', '3.12', '--from', 'griffe==2.4.1', 'griffe']},
           packages: [{
             name: 'pyrophone',
             search: ['../../src'],
+            members: {exclude: ['pyrophone.script.*']},
             sourceLink: {
               host: 'github',
               repo: repository,

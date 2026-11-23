@@ -1,0 +1,29 @@
+---
+import type {ComponentProps} from 'astro/types';
+import {DocstringSections, ModuleDoc} from 'starlight-pydocs/components';
+import {hrefForTarget} from 'starlight-pydocs/render';
+
+type Props = ComponentProps<typeof ModuleDoc>;
+
+const {doc, scope, labels} = Astro.props;
+const exports = doc.path === 'pyrophone.script' && doc.object.kind === 'module'
+  ? doc.object.exports ?? []
+  : undefined;
+const reexports = exports?.map((name) => {
+  const href = hrefForTarget(scope, scope.resolver.resolve(name, doc.path));
+  if (!href) throw new Error(`Missing API reference for ${doc.path}.${name}`);
+  return {name, href};
+});
+---
+
+{reexports ? (
+  <div class="pyd-module" data-pydocs-kind="module" data-pydocs-path={doc.path}>
+    <DocstringSections doc={doc} scope={scope} labels={labels} />
+    <h2 id="re-exports">Re-exports</h2>
+    <ul>
+      {reexports.map(({name, href}) => (
+        <li id={`${doc.path}.${name}`}><a href={href}><code>{name}</code></a></li>
+      ))}
+    </ul>
+  </div>
+) : <ModuleDoc {...Astro.props} />}
